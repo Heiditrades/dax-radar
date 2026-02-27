@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DAX Indexwechsel-Radar</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Playfair+Display:wght@700;900&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #f5f0e8;
+  --paper: #faf7f2;
+  --ink: #1a1612;
+  --ink-light: #6b6358;
+  --ink-faint: #b8b0a4;
+  --rule: #d4cdc4;
+  --up-dark: #1a4a2e;
+  --up-mid: #2d7a4f;
+  --up-light: #e8f4ed;
+  --down-dark: #4a1a1a;
+  --down-mid: #9b3030;
+  --down-light: #f4e8e8;
+  --dax: #1a3a5c;
+  --dax-light: #e8eef5;
+  --mdax: #3d2b1a;
+  --mdax-light: #f5ede5;
+  --sdax: #2d1a4a;
+  --sdax-light: #ede8f5;
+  --accent: #c4821a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+  min-height: 100vh;
+  padding: 0;
+}
+
+/* MASTHEAD */
+.masthead {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 1.5rem 2.5rem 1.2rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-bottom: 3px solid var(--accent);
+}
+
+.masthead-left h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.4rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.masthead-left h1 em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.masthead-left .subtitle {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 0.4rem;
+}
+
+.masthead-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.fetch-btn {
+  background: var(--accent);
+  border: none;
+  color: var(--ink);
+  padding: 0.55rem 1.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.fetch-btn:hover { opacity: 0.85; }
+.fetch-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.next-review {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}
+
+/* TICKER BAR */
+.ticker-bar {
+  background: var(--accent);
+  padding: 0.35rem 2.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  display: flex;
+  gap: 2rem;
+}
+
+/* MAIN LAYOUT */
+.page {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* SECTION HEADERS */
+.section {
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+}
+.section:last-child { border-right: none; }
+
+.section-head {
+  padding: 1rem 1.5rem 0.8rem;
+  border-bottom: 2px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-head .label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  padding: 2px 8px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.badge-dax { background: var(--dax); color: var(--dax-light); }
+.badge-mdax { background: var(--mdax); color: var(--mdax-light); }
+.badge-sdax { background: var(--sdax); color: var(--sdax-light); }
+
+/* CANDIDATE CARDS */
+.candidates { flex: 1; padding: 1rem 0; }
+
+.candidate {
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: default;
+  transition: background 0.15s;
+  animation: slideIn 0.4s ease both;
+  position: relative;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.candidate:hover { background: rgba(0,0,0,0.03); }
+.candidate:last-child { border-bottom: none; }
+
+.candidate-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.company-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ticker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--ink-light);
+  margin-top: 2px;
+}
+
+.prob-block { text-align: right; flex-shrink: 0; }
+
+.prob-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.prob-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-top: 1px;
+}
+
+.direction-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.direction-arrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  padding: 1px 6px;
+}
+
+.arrow-up { color: var(--up-mid); background: var(--up-light); }
+.arrow-down { color: var(--down-mid); background: var(--down-light); }
+
+.direction-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--ink-light);
+}
+
+.prob-bar-wrap {
+  margin-top: 0.6rem;
+  background: var(--rule);
+  height: 3px;
+  border-radius: 1px;
+}
+
+.prob-bar {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 0.8s ease;
+}
+
+.bar-up { background: var(--up-mid); }
+.bar-down { background: var(--down-mid); }
+
+.rationale {
+  margin-top: 0.55rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ink-light);
+  font-weight: 300;
+}
+
+/* TIMELINE PANEL */
+.timeline-section {
+  grid-column: 1 / -1;
+  border-top: 2px solid var(--ink);
+  padding: 1.2rem 2.5rem;
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  background: var(--paper);
+}
+
+.timeline-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding-top: 3px;
+}
+
+.timeline-events {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  position: relative;
+}
+
+.timeline-events::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--rule);
+}
+
+.t-event {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  position: relative;
+}
+
+.t-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  border: 2px solid var(--bg);
+  z-index: 1;
+}
+
+.t-dot.now { background: var(--accent); }
+.t-dot.next { background: var(--up-mid); }
+
+.t-date {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--ink-light);
+  text-align: center;
+}
+
+.t-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--ink-light);
+  text-align: center;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.t-event.active .t-date { color: var(--accent); font-weight: 600; }
+.t-event.active .t-label { color: var(--accent); }
+
+/* STATE */
+.state-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  gap: 0.75rem;
+  color: var(--ink-faint);
+  padding: 2rem;
+}
+
+.spinner {
+  width: 24px; height: 24px;
+  border: 2px solid var(--rule);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.state-box p {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* FOOTNOTE */
+.footnote {
+  padding: 0.8rem 2.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--ink-faint);
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--rule);
+}
+
+.footnote a { color: var(--ink-faint); }
+
+/* LOADING OVERLAY */
+.loading-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--accent);
+}
+
+/* Source label */
+.source-label {
+  display: inline-block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  background: var(--accent);
+  color: var(--ink);
+  padding: 1px 5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.timestamp-line {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--ink-faint);
+  text-align: right;
+  padding: 0 2.5rem 0.3rem;
+}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="masthead-left">
+    <h1>DAX <em>Index</em>wechsel-Radar</h1>
+    <div class="subtitle">Kandidaten für Auf- &amp; Abstieg · DAX / MDAX / SDAX</div>
+  </div>
+  <div class="masthead-right">
+    <button class="fetch-btn" id="fetchBtn" onclick="fetchAnalysis()">▶ KI-Analyse starten</button>
+    <div class="next-review">Nächste Überprüfung: 04. März 2026 · Wirkung: 23. März 2026</div>
+  </div>
+</div>
+
+<div class="ticker-bar">
+  <span>INDEXWECHSEL-RADAR</span>
+  <span>·</span>
+  <span>DEUTSCHE BÖRSE ÜBERPRÜFUNG: QUARTALSWEISE</span>
+  <span>·</span>
+  <span>KRITERIUM: STREUBESITZ-MARKTKAPITALISIERUNG</span>
+  <span>·</span>
+  <span>KEIN ANLAGEBERATUNG</span>
+</div>
+
+<div class="page" id="mainGrid">
+  <!-- DAX Column -->
+  <div class="section">
+    <div class="section-head">
+      <div class="label">DAX <span class="badge badge-dax">40 TITEL</span></div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--ink-light)">→ MDAX</span>
+    </div>
+    <div class="candidates" id="col-dax">
+      <div class="state-box"><p>Klicke „KI-Analyse starten"<br>für aktuelle Kandidaten</p></div>
+    </div>
+  </div>
+
+  <!-- MDAX Column -->
+  <div class="section">
+    <div class="section-head">
+      <div class="label">MDAX <span class="badge badge-mdax">50 TITEL</span></div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--ink-light)">↑ DAX &nbsp;·&nbsp; ↓ SDAX</span>
+    </div>
+    <div class="candidates" id="col-mdax">
+      <div class="state-box"><p>Klicke „KI-Analyse starten"<br>für aktuelle Kandidaten</p></div>
+    </div>
+  </div>
+
+  <!-- SDAX Column -->
+  <div class="section">
+    <div class="section-head">
+      <div class="label">SDAX <span class="badge badge-sdax">70 TITEL</span></div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--ink-light)">↑ MDAX &nbsp;·&nbsp; ↓ Kein Index</span>
+    </div>
+    <div class="candidates" id="col-sdax">
+      <div class="state-box"><p>Klicke „KI-Analyse starten"<br>für aktuelle Kandidaten</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- Timeline -->
+<div class="timeline-section">
+  <div class="timeline-title">ÜBERPRÜFUNGS-<br>KALENDER 2026</div>
+  <div class="timeline-events">
+    <div class="t-event active">
+      <div class="t-dot now"></div>
+      <div class="t-date">04. MRZ 2026</div>
+      <div class="t-label">Nächste<br>Entscheidung</div>
+    </div>
+    <div class="t-event">
+      <div class="t-dot next"></div>
+      <div class="t-date">23. MRZ 2026</div>
+      <div class="t-label">Wirksamkeit<br>März</div>
+    </div>
+    <div class="t-event">
+      <div class="t-dot"></div>
+      <div class="t-date">JUN 2026</div>
+      <div class="t-label">Fast-Entry/<br>Exit Prüfung</div>
+    </div>
+    <div class="t-event">
+      <div class="t-dot"></div>
+      <div class="t-date">SEP 2026</div>
+      <div class="t-label">Ordentliche<br>Überprüfung</div>
+    </div>
+    <div class="t-event">
+      <div class="t-dot"></div>
+      <div class="t-date">DEZ 2026</div>
+      <div class="t-label">Fast-Entry/<br>Exit Prüfung</div>
+    </div>
+  </div>
+</div>
+
+<div class="timestamp-line" id="tsLine"></div>
+
+<div class="footnote">
+  <span>Quellen: Deutsche Börse · Handelsblatt · Börsen-Zeitung · BNP Paribas Indexmonitor · KI-Websuche</span>
+  <span>⚠ Prognosen — keine Anlageberatung. Indexwechsel hängen von Marktkapitalisierung ab.</span>
+</div>
+
+<script>
+async function fetchAnalysis() {
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = '⟳ Analysiere...';
+
+  const loading = `<div class="state-box"><div class="spinner"></div><p class="loading-text">KI sucht aktuelle<br>Marktdaten…</p></div>`;
+  document.getElementById('col-dax').innerHTML = loading;
+  document.getElementById('col-mdax').innerHTML = loading;
+  document.getElementById('col-sdax').innerHTML = loading;
+
+  const today = new Date().toLocaleDateString('de-DE', {day:'2-digit', month:'long', year:'numeric'});
+
+  const prompt = `Du bist ein Kapitalmarktexperte. Heute ist der ${today}. Nutze Websuche, um aktuelle Daten zu finden.
+
+Analysiere welche Unternehmen wahrscheinlich bald ihren DAX-Index wechseln werden (DAX ↔ MDAX ↔ SDAX).
+
+Antworte AUSSCHLIESSLICH mit einem JSON-Objekt (kein Markdown, keine Erklärungen außerhalb des JSON):
+
+{
+  "dax_candidates": [
+    {
+      "name": "Firmenname",
+      "ticker": "TICKER",
+      "direction": "down",
+      "from_index": "DAX",
+      "to_index": "MDAX",
+      "probability": 75,
+      "rationale": "Kurze Begründung auf Deutsch (max 1 Satz)"
+    }
+  ],
+  "mdax_candidates": [
+    {
+      "name": "Firmenname",
+      "ticker": "TICKER",
+      "direction": "up",
+      "from_index": "MDAX",
+      "to_index": "DAX",
+      "probability": 80,
+      "rationale": "Kurze Begründung auf Deutsch (max 1 Satz)"
+    }
+  ],
+  "sdax_candidates": [
+    {
+      "name": "Firmenname",
+      "ticker": "TICKER",
+      "direction": "up",
+      "from_index": "SDAX",
+      "to_index": "MDAX",
+      "probability": 60,
+      "rationale": "Kurze Begründung auf Deutsch (max 1 Satz)"
+    }
+  ]
+}
+
+Regeln:
+- dax_candidates: Unternehmen, die aus dem DAX in den MDAX absteigen könnten (direction: "down")
+- mdax_candidates: Unternehmen aus dem MDAX, die in den DAX aufsteigen könnten (direction: "up") ODER aus dem MDAX in den SDAX absteigen (direction: "down")
+- sdax_candidates: Unternehmen aus dem SDAX, die in den MDAX aufsteigen könnten (direction: "up") ODER die den SDAX verlassen könnten (direction: "down")
+- probability: 0-100, basierend auf aktueller Marktkapitalisierung und Ranglisten
+- Verwende echte aktuelle Daten aus Websuche (Deutsche Börse Indexranking, Handelsblatt, etc.)
+- Gib jeweils 2-4 Kandidaten pro Spalte an
+- Das JSON muss valide sein`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('Kein JSON in Antwort gefunden');
+
+    const parsed = JSON.parse(match[0]);
+    renderColumn('col-dax', parsed.dax_candidates || [], 'dax');
+    renderColumn('col-mdax', parsed.mdax_candidates || [], 'mdax');
+    renderColumn('col-sdax', parsed.sdax_candidates || [], 'sdax');
+
+    const now = new Date();
+    document.getElementById('tsLine').textContent =
+      `Letzte Analyse: ${now.toLocaleDateString('de-DE')} · ${now.toLocaleTimeString('de-DE')} Uhr · Powered by Claude KI-Websuche`;
+
+  } catch(e) {
+    console.error(e);
+    const err = `<div class="state-box"><p style="color:var(--down-mid)">Fehler beim Abrufen:<br>${e.message}</p></div>`;
+    document.getElementById('col-dax').innerHTML = err;
+    document.getElementById('col-mdax').innerHTML = err;
+    document.getElementById('col-sdax').innerHTML = err;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↺ Erneut analysieren';
+  }
+}
+
+function renderColumn(id, candidates, indexKey) {
+  const container = document.getElementById(id);
+  if (!candidates.length) {
+    container.innerHTML = '<div class="state-box"><p>Keine Kandidaten gefunden</p></div>';
+    return;
+  }
+
+  container.innerHTML = candidates.map((c, i) => {
+    const isUp = c.direction === 'up';
+    const arrowClass = isUp ? 'arrow-up' : 'arrow-down';
+    const barClass = isUp ? 'bar-up' : 'bar-down';
+    const probColor = isUp ? 'var(--up-mid)' : 'var(--down-mid)';
+    const arrow = isUp ? '▲' : '▼';
+    const moveLabel = `${c.from_index} → ${c.to_index}`;
+    const delay = `animation-delay: ${i * 0.1}s`;
+
+    return `
+    <div class="candidate" style="${delay}">
+      <div class="candidate-top">
+        <div>
+          <div class="company-name">${c.name}</div>
+          <div class="ticker">${c.ticker || '—'}</div>
+        </div>
+        <div class="prob-block">
+          <div class="prob-value" style="color:${probColor}">${c.probability}%</div>
+          <div class="prob-label">Wahrsch.</div>
+        </div>
+      </div>
+
+      <div class="direction-row">
+        <span class="direction-arrow ${arrowClass}">${arrow}</span>
+        <span class="direction-text">${moveLabel}</span>
+      </div>
+
+      <div class="prob-bar-wrap">
+        <div class="prob-bar ${barClass}" style="width:${c.probability}%"></div>
+      </div>
+
+      <div class="rationale">${c.rationale || ''}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
